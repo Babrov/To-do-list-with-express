@@ -2,6 +2,7 @@ const bodyParser = require('body-parser');
 const express = require('express');
 const app = express();
 const mongoose = require('mongoose');
+const _ = require('lodash')
 
 app.set('view engine', 'ejs');
 
@@ -51,7 +52,7 @@ app.get('/', function (req, res) {
 });
 
 app.get('/:customListName', (req, res) => {
-  const customListName = req.params.customListName;
+  const customListName = _.capitalize(req.params.customListName);
   List.findOne({name: customListName}, (err,foundList) => {
     if (!err) {
       if (!foundList) {
@@ -71,16 +72,37 @@ app.get('/:customListName', (req, res) => {
 
 app.post('/', (req, res) => {
   let itemName = req.body.newItem;
+  let listName = req.body.list;
+
   const itemNew = new Item({
     name: itemName,
   });
+  if (listName === 'Today') {
   itemNew.save();
   res.redirect('/');
+  } else {
+    List.findOne({name: listName},(err,foundList)=> {
+      foundList.items.push(itemNew)
+      foundList.save();
+      res.redirect('/'+listName);
+    })
+  }
 });
 
 app.post('/delete', (req, res) => {
-  Item.findByIdAndRemove(req.body.checkbox,(err) => err ?  console.log(err) : "")
-  res.redirect('/');
+  const checkedItemId = req.body.checkbox;
+  const listName = req.body.listName;
+  if (listName === 'Today') {
+    Item.findByIdAndRemove(checkedItemId,(err) => err ?  console.log(err) : "")
+    res.redirect('/');
+  } else {
+    List.findOneAndUpdate({name:listName},{$pull: {items: {_id: checkedItemId}}},(err, foundList) => {
+      if (!err) {
+        res.redirect('/' + listName)
+      } 
+    })
+  }
+  
 
 });
 
